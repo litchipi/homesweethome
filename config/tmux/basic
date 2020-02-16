@@ -1,0 +1,98 @@
+# 0 is too far from ` ;)
+set -g base-index 0
+
+# Automatically set window title
+set-window-option -g automatic-rename on
+set-option -g set-titles on
+
+set -g default-terminal screen-256color
+
+set -g status-keys vi
+set -g history-limit 10000
+
+setw -g mode-keys vi
+#setw -g mode-mouse on
+set -g mouse on
+setw -g monitor-activity on
+
+
+unbind-key C-b
+set -g prefix M-p
+
+unbind d
+unbind z
+unbind q
+unbind s
+bind-key f split-window -h
+bind-key r split-window -v
+
+bind-key q previous-window
+bind-key Q resize-pane -L 3
+bind-key d next-window
+bind-key D resize-pane -R 3
+bind-key Z resize-pane -U 3
+bind-key S resize-pane -D 3
+
+bind-key a select-pane -t :.-
+bind-key A swap-pane -D
+bind-key e select-pane -t :.+
+bind-key E swap-pane -U
+bind-key z new-window
+bind-key s confirm-before -p "kill-window #W? (y/n)" kill-pane
+bind-key M-s confirm-before -p "kill-window #W? (y/n)" kill-window
+bind-key m resize-pane -Z
+
+bind-key M-q swap-window -t -1
+bind-key M-d swap-window -t +1
+
+bind-key p paste-buffer
+bind-key o copy-mode
+bind -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'
+
+bind-key n command-prompt -I "#W" "rename-window -- '%%'"
+bind-key Tab choose-tree
+
+bind-key & select-window -t 0
+bind-key é select-window -t 1
+bind-key '"' select-window -t 2
+bind-key "'" select-window -t 3
+bind-key ( select-window -t 4
+bind-key - select-window -t 5
+bind-key è select-window -t 6
+bind-key _ select-window -t 7
+bind-key ç select-window -t 8
+bind-key à select-window -t 9
+
+#INSTALL
+#	https://github.com/NHDaly/tmux-better-mouse-mode
+
+# No delay for escape key press
+set -sg escape-time 0
+
+# THEME
+set -g status-bg black
+set -g status-fg white
+#set -g window-status-current-bg white
+#set -g window-status-current-fg black
+#set -g window-status-current-attr bold
+set -g status-interval 60
+set -g status-left-length 30
+set -g status-right '#{prefix_highlight} #{online_status} #{cpu_fg_color} #{cpu_percentage} #[fg=white]%H:%M#[default]'
+set -g status-left '#[fg=green](#S) #(whoami)'
+
+#TODO
+#   Set format of status line and windows"
+
+
+set -g @urlview-key 'u'
+set -g @online_icon "ok"
+set -g @offline_icon "offline!"
+
+run-shell ~/.tmux/plugins/tmux-copycat/copycat.tmux
+run-shell ~/.tmux/plugins/tmux-yank/yank.tmux
+run-shell ~/.tmux/plugins/tmux-prefix-highlight/prefix_highlight.tmux
+run-shell ~/.tmux/plugins/tmux-online-status/online_status.tmux
+run-shell ~/.tmux/plugins/tmux-cpu/cpu.tmux
+run-shell ~/.tmux/plugins/tmux-urlview/urlview.tmux
+
+source-file ~/.tmux/plugins/tmux-themepack/custom.tmuxtheme #powerline/double/purple.tmuxtheme
