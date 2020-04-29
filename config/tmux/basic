@@ -92,7 +92,6 @@ run-shell ~/.tmux/plugins/tmux-copycat/copycat.tmux
 run-shell ~/.tmux/plugins/tmux-yank/yank.tmux
 run-shell ~/.tmux/plugins/tmux-prefix-highlight/prefix_highlight.tmux
 run-shell ~/.tmux/plugins/tmux-online-status/online_status.tmux
-run-shell ~/.tmux/plugins/tmux-cpu/cpu.tmux
 run-shell ~/.tmux/plugins/tmux-urlview/urlview.tmux
 
 source-file ~/.tmux/plugins/tmux-themepack/custom.tmuxtheme #powerline/double/purple.tmuxtheme

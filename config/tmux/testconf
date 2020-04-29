@@ -81,19 +81,4 @@ set -g status-left-length 30
 set -g status-right '#{prefix_highlight} #{online_status} #{cpu_fg_color} #{cpu_percentage} #[fg=white]%H:%M#[default]'
 set -g status-left '#[fg=green](#S) #(whoami)'
 
-#TODO
-#   Set format of status line and windows"
-
-
-set -g @urlview-key 'u'
-set -g @online_icon "ok"
-set -g @offline_icon "offline!"
-
-run-shell ~/.tmux/plugins/tmux-copycat/copycat.tmux
-run-shell ~/.tmux/plugins/tmux-yank/yank.tmux
-run-shell ~/.tmux/plugins/tmux-prefix-highlight/prefix_highlight.tmux
-run-shell ~/.tmux/plugins/tmux-online-status/online_status.tmux
-run-shell ~/.tmux/plugins/tmux-cpu/cpu.tmux
-run-shell ~/.tmux/plugins/tmux-urlview/urlview.tmux
-
 source-file ~/.tmux/plugins/tmux-themepack/custom.tmuxtheme #powerline/double/purple.tmuxtheme
