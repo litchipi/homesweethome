@@ -43,6 +43,7 @@ set shiftwidth=4
 set tabstop=4
 set smarttab
 set expandtab
+set number
 "set completeopt-=preview
 au BufWritePost * if v:this_session != "" | exe "mksession! ".v:this_session
 
@@ -138,8 +139,8 @@ hi NeomakeVirtualtextWarning guifg=#512866
 
 " SPECIFIC CONFIGURATION TO C
 
-let g:ncm2_pyclang#library_path = '/usr/lib/llvm-8/lib/libclang.so'
-let g:clang_library_path='/usr/lib/llvm-8/lib/libclang.so'
+let g:ncm2_pyclang#library_path = '/usr/lib/llvm-7/lib/libclang.so.1'
+let g:clang_library_path='/usr/lib/llvm-7/lib/libclang.so.1'
 
 let g:neomake_cpp_enable_makers = ['clang']
 let g:neomake_cpp_clang_maker = {'exe': 'clang'}

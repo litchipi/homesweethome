@@ -260,7 +260,7 @@ def init_gitrepo(d):
     os.system("git add *")
     os.system("git commit -m 'Project initialisation'")
 
-    os.system("echo -e \".gitignore\n.alias/*\n.load.sh\n.envrc\n.*.swp\n.*.swo\" > .gitignore")
+    os.system("echo \".gitignore\n.alias/*\n.load.sh\n.envrc\n.*.swp\n.*.swo\n.*_ses\" > .gitignore")
     os.chdir("..")
     os.system("clear")
 
@@ -277,25 +277,32 @@ def check_init_filesystem(script, rootdir):
             check_dir_exist(cfgdir + "/" + conf_type)
             config_files[conf_type] = choose_conf(cfgdir + "/" + conf_type)
         create_script(script, config_files, cfgdir)
+        os.symlink(os.getenv("HOME") + "/.local/", os.path.dirname(script) + "/.local")
+        os.symlink(os.getenv("HOME") + "/.config/", os.path.dirname(script) + "/.config")
 
     if not os.path.isdir(os.path.dirname(script) + "/.git"):
         init_gitrepo(os.path.dirname(script))
 
 def create_script(fname, cfg, config_dir, envrc_vars={}):
+    session_name = fname.split("/")[-2]
+    session_dir = os.path.dirname(fname)
+
     tmux_save = config_dir + "/aliases/save_tmux_session.sh"
     tmux_switch = config_dir + "/aliases/switch_tmux_session.sh"
     tmux_quit = config_dir + "/aliases/quit_tmux_session.sh"
+
     envrc_vars["project_manager_script_path"] = os.path.abspath(config_dir + "/..")
+    envrc_vars["HOME"] = os.path.abspath(session_dir)
+
+
     replace_script = config_dir + "/replace_session_script.py"
 
-    session_name = fname.split("/")[-2]
-    session_dir = os.path.dirname(fname)
 
     create_alias = lambda d, a, c: "echo -e '#!/bin/bash\n" + c + "' > " + d + "/" + a
     all_aliases = {
         "save":tmux_save + " " + session_name + " " + replace_script + " " + fname,
-        "switch":tmux_switch + " " + session_name,
-        "quit":tmux_quit + " " + session_name
+        "switch":tmux_switch + " " + session_name +"_socket",
+        "quit":tmux_quit + " " + session_name + "_socket"
         }
 
     script = ["#!/bin/bash"]
@@ -303,7 +310,7 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
     script.append("if [ $# -eq 1 ]; then")
     script.append("tmux_socket_name=$1")
     script.append("else")
-    script.append("tmux_socket_name=\"" + session_name + "\"")
+    script.append("tmux_socket_name=\"" + session_name + "_socket\"")
     script.append("fi")
     script.append("tmux_cmd=\"tmux -L $tmux_socket_name\"")
     
@@ -326,18 +333,20 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
             script.append("fi")
             script.append("")
 
-    script.append("#TMUXSOCKETNAME:" + session_name + ":SOCKETEND")
-    script.append("echo -e \"PATH_add .alias\n" +
+    script.append("#TMUXSOCKETNAME:" + session_name + "_socket:SOCKETEND")
+    script.append("echo \"PATH_add .alias\n" +
             "\n".join(["export " + key.upper() + "=" + val for key, val in envrc_vars.items()]) + 
             "\" > " + session_dir + "/.envrc")
     script.append("direnv allow " + session_dir + "/")
     script.append("")
+
+
     script.append("$tmux_cmd -f " + config_dir + "/tmux/" + cfg['tmux'] + " new-session -d -s " + session_name + " -c " + session_dir)
     script.append("sleep 0.2")
 
     script.append("#TMUXSESSION:START")
-    script.append("""$tmux_cmd send-keys -t {}:0.0 'echo "Session {} started"' Enter"""
-                                                    .format(session_name, session_name))
+#    script.append("""$tmux_cmd send-keys -t {}:0.0 'echo "Session {} started"' Enter"""
+#                                                    .format(session_name, session_name))
     script.append("$tmux_cmd attach-session -t {}".format(session_name))
     script.append("#TMUXSESSION:END")
 

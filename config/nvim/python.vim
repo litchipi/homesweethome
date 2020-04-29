@@ -40,6 +40,7 @@ set shiftwidth=4
 set tabstop=4
 set smarttab
 set expandtab
+set number
 "set completeopt-=preview
 au BufWritePost * if v:this_session != "" | exe "mksession! ".v:this_session
 
