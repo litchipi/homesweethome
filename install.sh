@@ -8,7 +8,9 @@ cd ./copydirs/
         mkdir -p plugins && cd ./plugins
         git clone https://github.com/jimeh/tmux-themepack
         cp ../custom.tmuxtheme ./tmux-themepack
-    cd .. && mv ./plugins/ ~/.tmux/
+        cd ..
+    mkdir -p ~/.tmux/
+    mv ./plugins/ ~/.tmux/
 cd ..
 
 echo "############# HOME SWEET HOME #################" >> ~/.bashrc
