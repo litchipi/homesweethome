@@ -347,7 +347,10 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
     script.append("#TMUXSESSION:START")
 #    script.append("""$tmux_cmd send-keys -t {}:0.0 'echo "Session {} started"' Enter"""
 #                                                    .format(session_name, session_name))
+
+    script.append("$tmux_cmd select-window -t {}:0.0".format(session_name))
     script.append("$tmux_cmd attach-session -t {}".format(session_name))
+
     script.append("#TMUXSESSION:END")
 
     with open(fname, "w") as fichier:

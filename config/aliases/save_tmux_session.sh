@@ -81,6 +81,7 @@ setup() {
 }
 
 teardown() {
+  echo "tmux select-window -t $1:0.0" >> $filename
   echo 'tmux attach -t' $1 >> $filename
 #  echo 'tmux -2u att' >> $filename
   chmod +x $filename
