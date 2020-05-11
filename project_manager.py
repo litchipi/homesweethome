@@ -364,13 +364,7 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
     welcome_message = "Session " + session_name + " initialized" + \
             "\nTo enable logging, please enter command \'save\' and \'quit\', then restart the session"
     script.append("""$tmux_cmd send-keys -t {}:0.0 'clear && echo "{}"' Enter""".format(session_name, welcome_message))
-
     script.append("$tmux_cmd select-window -t {}:0.0".format(session_name))
-
-    script.append("#IGNORED_PART")
-    script.append(all_aliases["save"])
-    script.append("#ENDIGNORED_PART")
-
     script.append("$tmux_cmd attach-session -t {}".format(session_name))
 
     script.append("#TMUXSESSION:END")
@@ -389,8 +383,12 @@ def launch(workdir):
         sys.exit(0)
     check_init_filesystem(script, os.path.abspath("."))
     e = yes_no_prompt("Do you want to execute script:\n\t{} ?".format(script))
-    os.system(script)
-#    os.system("clear")
+
+    with open("/tmp/hsh_path", "w") as f:
+        f.write(script)
+    sys.exit(0)
+    #cmd = "eval '$(direnv export bash)' && " + script
+    #os.system(cmd)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
