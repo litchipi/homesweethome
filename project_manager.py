@@ -106,6 +106,8 @@ def exec_command(cmd, cfg, projects):
         d = choose_directory()
         cfg[n]["env_directory"] = os.path.abspath(d)
         cfg[n]["load_script"] = "load.sh"
+#        "save":tmux_save + " " + session_name + " " + replace_script + " " + fname,
+
         return cfg, True
 
     elif cmd == "Load":
@@ -205,7 +207,6 @@ def save_cfg(cfg, cfgfile):
 
 def main(datapath, rerun=False, cfg_fname="projects.ini"):
     cfgfile = os.path.abspath(datapath + cfg_fname)
-    print("CONFIG FILE LOCATED AT {}".format(cfgfile))
     cfg = configparser.ConfigParser()
     cfg.read(cfgfile)
 
@@ -264,6 +265,10 @@ def init_gitrepo(d):
     os.chdir("..")
     os.system("clear")
 
+def create_home_symlink(name, script, is_dir=True):
+    os.symlink(os.getenv("HOME") + "/" + name + ("/"*is_dir), os.path.dirname(script) + "/" + name)
+
+
 def check_init_filesystem(script, rootdir):
     cfgdir = rootdir + "/config"
     bckdir = rootdir + "/backup"
@@ -277,43 +282,49 @@ def check_init_filesystem(script, rootdir):
             check_dir_exist(cfgdir + "/" + conf_type)
             config_files[conf_type] = choose_conf(cfgdir + "/" + conf_type)
         create_script(script, config_files, cfgdir)
-        os.symlink(os.getenv("HOME") + "/.local/", os.path.dirname(script) + "/.local")
-        os.symlink(os.getenv("HOME") + "/.config/", os.path.dirname(script) + "/.config")
+        create_home_symlink(".bashrc", script, False)
+        create_home_symlink(".tmux", script)
+        create_home_symlink(".local", script)
+        create_home_symlink(".config", script)
 
     if not os.path.isdir(os.path.dirname(script) + "/.git"):
         init_gitrepo(os.path.dirname(script))
 
 def create_script(fname, cfg, config_dir, envrc_vars={}):
+    bckdir = config_dir + "/../backup"
     session_name = fname.split("/")[-2]
-    session_dir = os.path.dirname(fname)
+    session_dir_path = os.path.dirname(fname)
 
     tmux_save = config_dir + "/aliases/save_tmux_session.sh"
     tmux_switch = config_dir + "/aliases/switch_tmux_session.sh"
     tmux_quit = config_dir + "/aliases/quit_tmux_session.sh"
 
     envrc_vars["project_manager_script_path"] = os.path.abspath(config_dir + "/..")
-    envrc_vars["HOME"] = os.path.abspath(session_dir)
-
+    envrc_vars["HOME"] = os.path.abspath(session_dir_path)
 
     replace_script = config_dir + "/replace_session_script.py"
-
 
     create_alias = lambda d, a, c: "echo -e '#!/bin/bash\n" + c + "' > " + d + "/" + a
     all_aliases = {
         "save":tmux_save + " " + session_name + " " + replace_script + " " + fname,
         "switch":tmux_switch + " " + session_name +"_socket",
-        "quit":tmux_quit + " " + session_name + "_socket"
+        "quit":tmux_quit + " " + session_name + "_socket",
         }
 
     script = ["#!/bin/bash"]
     script.append("")
+    script.append("USER_HOME=$(cat /etc/passwd|grep $(whoami)|cut -d ':' -f 6)")
+    script.append("PROJECT_ABSPATH="+session_dir_path)
+    session_dir="$PROJECT_ABSPATH"
     script.append("if [ $# -eq 1 ]; then")
     script.append("tmux_socket_name=$1")
     script.append("else")
     script.append("tmux_socket_name=\"" + session_name + "_socket\"")
     script.append("fi")
     script.append("tmux_cmd=\"tmux -L $tmux_socket_name\"")
-    
+
+    script.append("mkdir -p " + session_dir + "/.log")
+    script.append(config_dir + "/backup_log_files.py " + session_dir + "/.log/ " + bckdir)
     script.append("mkdir -p " + session_dir + "/.alias")
 
     for alias, cmd in all_aliases.items():
@@ -323,7 +334,7 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
 
     for name, opt in SPECIAL_CONFIGS.items():
         if cfg[name] != "":
-            script.append(name + "_cmd=$(which " + name + ")")
+            script.append(name + "_cmd=$(whereis " + name + "|cut -d ' ' -f 2)")
             script.append("if [ ! -z \"${}\" ]".format(name + "_cmd"))
             script.append("then")
             script.append(create_alias(session_dir + "/.alias", name,
@@ -333,6 +344,7 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
             script.append("fi")
             script.append("")
 
+
     script.append("#TMUXSOCKETNAME:" + session_name + "_socket:SOCKETEND")
     script.append("echo \"PATH_add .alias\n" +
             "\n".join(["export " + key.upper() + "=" + val for key, val in envrc_vars.items()]) + 
@@ -340,15 +352,25 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
     script.append("direnv allow " + session_dir + "/")
     script.append("")
 
+    start_log_cmd = "/bin/bash " + config_dir + "/../scripts/toggle_logging.sh"
+    script.append("echo -e '. '$USER_HOME'/.bashrc\n{}' > $PROJECT_ABSPATH/.bash_profile".format(start_log_cmd))
 
     script.append("$tmux_cmd -f " + config_dir + "/tmux/" + cfg['tmux'] + " new-session -d -s " + session_name + " -c " + session_dir)
+
+    #script.append("$tmux_cmd set -g default-command ")
     script.append("sleep 0.2")
 
     script.append("#TMUXSESSION:START")
-#    script.append("""$tmux_cmd send-keys -t {}:0.0 'echo "Session {} started"' Enter"""
-#                                                    .format(session_name, session_name))
+    welcome_message = "Session " + session_name + " initialized" + \
+            "\nTo enable logging, please enter command \'save\' and \'quit\', then restart the session"
+    script.append("""$tmux_cmd send-keys -t {}:0.0 'clear && echo "{}"' Enter""".format(session_name, welcome_message))
 
     script.append("$tmux_cmd select-window -t {}:0.0".format(session_name))
+
+    script.append("#IGNORED_PART")
+    script.append(all_aliases["save"])
+    script.append("#ENDIGNORED_PART")
+
     script.append("$tmux_cmd attach-session -t {}".format(session_name))
 
     script.append("#TMUXSESSION:END")
