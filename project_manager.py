@@ -257,7 +257,7 @@ def check_dir_exist(d):
 def init_gitrepo(d):
     os.chdir(d)
     os.system("git init")
-    os.system("touch README")
+    os.system("touch README.md")
     os.system("git add *")
     os.system("git commit -m 'Project initialisation'")
 
