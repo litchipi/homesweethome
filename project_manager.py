@@ -15,6 +15,7 @@ import time
 import configparser
 from termenu import show_menu, Minimenu, OptionGroup
 import getpass
+from cantreadth1s import CantReadThis
 
 SPECIAL_CONFIGS = {
         "nvim":"-u"
@@ -82,12 +83,6 @@ def sanitize_name(name):
             res += "_"
     return res
 
-def encrypt_backup_file(fname, pwd):
-    shutil.move(fname, fname.replace(".zip", ""))
-
-def decrypt_backup_file(fname, pwd):
-    shutil.move(fname, fname + ".zip")
-
 def exec_command(cmd, cfg, projects):
     get_pwd = lambda i: b58encode_check(sha512(i.encode()).digest())
 
@@ -144,60 +139,55 @@ def exec_command(cmd, cfg, projects):
         proj_link = {data["display_name"]:name for name, data in projects.items()}
         if len(proj_link.keys()) == 0: return None, True
         name = show_menu("Select project to backup", list(proj_link.keys()))
-
-        p = getpass.getpass("Enter a password to encrypt backup (unencrypted if none): ")
-        if p != "":
-            check = ""
-            pwd = get_pwd(p)
-            while pwd != check:
-                check = get_pwd(getpass.getpass("Verify password: "))
-        else:   pwd = None
-
-        include_git = yes_no_prompt("Include git repository to backup ?")
-
-        forbidden = []
-        if not include_git: forbidden += [".git", ".gitignore"]
-        zf = zipfile.ZipFile(os.path.abspath("./backup/" + name + ".zip"), mode='w', 
-                                                           compression=zipfile.ZIP_DEFLATED)
-        zf.writestr("project_cfg", json.dumps(dict(cfg[name])))
-        cdir = os.curdir
+        with open(cfg[name]["env_directory"] + "/" + ".hsh_project_configuration", "w") as f:
+            f.write(json.dumps(cfg[name]))
         os.chdir(cfg[name]["env_directory"] + "/..")
-        for root, d, files in os.walk(os.path.relpath(cfg[name]["env_directory"])):
-            if not all([el not in root for el in forbidden]): continue
-            for f in files:
-                if all([el not in f for el in forbidden]):
-                    zf.write(os.path.join(root, f))
-        zf.close()
-        os.chdir(cdir)
-        if pwd is not None:
-            encrypt_backup_file(os.path.abspath("./backup/" + name + ".zip"), pwd)
+        crt = CantReadThis()
+        crt.handle_directory(cfg[name]["env_directory"], out=os.path.abspath("./backup/" + name))
         return cfg, True
 
     elif cmd == "Restore":
         pwd=None
+        install_path = os.path.abspath(os.curdir)
         poss = list(glob.glob("./backup/*"))
         if len(poss) == 0: return None, True
+        poss = [el for el in poss if "logbck" not in el]
         fname = show_menu("Select project to restore", poss)
         fpath = ""
         while fpath == "" or not os.path.isdir(fpath):
             fpath = os.path.abspath(input("Enter path where to extract it: "))
+            os.chdir(fpath)
 
-        try:
-            zf = zipfile.ZipFile(fname, mode='r', compression=zipfile.ZIP_DEFLATED)
-        except:
-            decrypt_backup_file(fname, get_pwd(getpass.getpass("Enter the password")))
-            zf = zipfile.ZipFile(fname, mode='r', compression=zipfile.ZIP_DEFLATED)
+        crt = CantReadThis()
+        crt.handle_file(fname)
+        with open(fpath + "/.hsh_project_configuration", "r") as f:
+            project_config = json.load(f)
+        projname = project_config["display_name"]
 
-        project_config = json.loads(zf.read("project_cfg", pwd=pwd).decode())
-        zf.extractall(path=fpath, pwd=pwd)
-        zf.close()
-        projname = sanitize_name(project_config["display_name"])
+        modify_paths_loadscript([("PROJECT_ABSPATH=", os.path.abspath(fpath + "/" + projname)), ("INSTALL_ABSPATH=", install_path)])
         os.system("chmod +x {}/{}/.load.sh".format(fpath, projname))
 
         cfg[projname] = project_config
-        os.remove(fpath + "/project_cfg")
+        os.remove(fpath + "/.hsh_project_configuration")
         return cfg, True
     return None, False
+
+def modify_paths_loadscript(path, rep):
+    for s, r in rep:
+        with open(path, "r") as f:
+            loadini = f.read()
+        if s not in loadini:
+            with open(path, "w") as f:
+                f.write(loadini.split("\n")[0])
+                f.write(s + r + "\n")
+                f.write("\n".join(loadini.split("\n")[1:]))
+            continue
+        start = loadini.find(s) + len(s)
+        end = loadini[start:].find("\n")
+        with open(path, "w") as f:
+            f.write(loadini[:start])
+            f.write(r)
+            f.write(loadini[end:])
 
 def save_cfg(cfg, cfgfile):
     if cfg is not None:
@@ -226,7 +216,7 @@ def main(datapath, rerun=False, cfg_fname="projects.ini"):
     if not CHOICE_ONLY:
         commands = ["New", "Load", "Delete", "Backup", "Restore"] + commands
     usr = create_menu({"Projects":(0, projects_menu), "Commands":(1, commands)}).replace("\t", "")
-    if usr in commands: 
+    if usr in commands:
         cfg, re_run = exec_command(usr, cfg, projects)
         save_cfg(cfg, cfgfile)
         if re_run:
@@ -291,6 +281,8 @@ def check_init_filesystem(script, rootdir):
         init_gitrepo(os.path.dirname(script))
 
 def create_script(fname, cfg, config_dir, envrc_vars={}):
+    install_path = os.path.abspath(config_dir + "/../")
+    config_dir = config_dir.replace(install_path, "$INSTALL_ABSPATH")
     bckdir = config_dir + "/../backup"
     session_name = fname.split("/")[-2]
     session_dir_path = os.path.dirname(fname)
@@ -299,14 +291,14 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
     tmux_switch = config_dir + "/aliases/switch_tmux_session.sh"
     tmux_quit = config_dir + "/aliases/quit_tmux_session.sh"
 
-    envrc_vars["project_manager_script_path"] = os.path.abspath(config_dir + "/..")
+    envrc_vars["project_manager_script_path"] = install_path + "/script"
     envrc_vars["HOME"] = os.path.abspath(session_dir_path)
 
     replace_script = config_dir + "/replace_session_script.py"
 
-    create_alias = lambda d, a, c: "echo -e '#!/bin/bash\n" + c + "' > " + d + "/" + a
+    create_alias = lambda d, a, c: "echo -e \"#!/bin/bash\n" + c + "\" > " + d + "/" + a
     all_aliases = {
-        "save":tmux_save + " " + session_name + " " + replace_script + " " + fname,
+        "save":tmux_save + " " + session_name + " " + replace_script + " " + fname.replace(install_path, "$INSTALL_ABSPATH"),
         "switch":tmux_switch + " " + session_name +"_socket",
         "quit":tmux_quit + " " + session_name + "_socket",
         }
@@ -316,6 +308,7 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
     script.append("USER_HOME=$(cat /etc/passwd|grep $(whoami)|cut -d ':' -f 6)")
     script.append("PROJECT_ABSPATH="+session_dir_path)
     session_dir="$PROJECT_ABSPATH"
+    script.append("INSTALL_ABSPATH="+install_path)
     script.append("if [ $# -eq 1 ]; then")
     script.append("tmux_socket_name=$1")
     script.append("else")
@@ -338,8 +331,8 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
             script.append("if [ ! -z \"${}\" ]".format(name + "_cmd"))
             script.append("then")
             script.append(create_alias(session_dir + "/.alias", name,
-                "'$" + name + "_cmd '" + opt + " " + config_dir + "/" + name + "/" + cfg[name]
-                + " $@"))
+                "\"$" + name + "_cmd\" " + opt + " " + config_dir + "/" + name + "/" + cfg[name]
+                + " \"\'$@\'\""))
             script.append("chmod +x " + session_dir + "/.alias/" + name)
             script.append("fi")
             script.append("")
@@ -347,7 +340,7 @@ def create_script(fname, cfg, config_dir, envrc_vars={}):
 
     script.append("#TMUXSOCKETNAME:" + session_name + "_socket:SOCKETEND")
     script.append("echo \"PATH_add .alias\n" +
-            "\n".join(["export " + key.upper() + "=" + val for key, val in envrc_vars.items()]) + 
+            "\n".join(["export " + key.upper() + "=" + val for key, val in envrc_vars.items()]) +
             "\" > " + session_dir + "/.envrc")
     script.append("direnv allow " + session_dir + "/")
     script.append("")

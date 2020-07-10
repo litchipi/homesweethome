@@ -1,8 +1,15 @@
 #!/bin/bash
 
+script_file="/tmp/hsh_path" #Defined in project_manager.py
+
+rm -f $script_file
 cd "$(dirname $0)"
 python3 ./project_manager.py
-script=$(cat /tmp/hsh_path)
-cd $(dirname $script)
-eval $(direnv export bash)
-./.load.sh
+
+if test -f "$script_file"; then
+    script=$(cat $script_file)
+    cd $(dirname $script)
+    eval $(direnv export bash)
+    ./.load.sh
+fi
+
