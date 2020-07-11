@@ -18,3 +18,15 @@ class Core:
 def launch_hsh(args):
     core = Core(args.__dict__)
     core.run()
+
+
+
+# GET SAVED SNAPSHOTS
+# for _,_,f in os.walk(tmuxp.cli.get_config_dir() + "/"):
+#     print(f)
+
+# Freeze a session as json to a specific file
+#s = libtmux.Server(socket_name="homesweethome_socket")
+#d = tmuxp.workspacebuilder.freeze(s.list_sessions()[0])
+#with open("homesweethome_session", "w") as f:
+#   json.dump(d, f)

@@ -10,8 +10,3 @@ TODO:
     - Change tmux default command on new pane to the script thing
     - Create archive of past log files when opening project and store them in compressed archive
     tmux set -g default-command "script -f /tmp/testlogtmuxpane -c 'bash -i'"
-
-
-
-
-
