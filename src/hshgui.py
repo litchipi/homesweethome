@@ -8,7 +8,7 @@ from menu_handler import MenuHandler
 
 from cantreadth1s import CantReadThis
 
-class Core(MenuHandler):
+class GUICore(MenuHandler):
     default_config = {
             "crt_seclevel":10,
             "backup_dir":"./backup/",
@@ -28,6 +28,7 @@ class Core(MenuHandler):
 
     def setup_filesystem(self):
         for d in ["sessions_dir", "backup_dir"]:
+            self.config[d] = os.path.abspath(self.config[d])
             if not os.path.isdir(self.config[d]):
                 os.mkdir(self.config[d])
 
@@ -42,9 +43,12 @@ class Core(MenuHandler):
             self.final_project = (self.project_selected, self.projects_configs[self.project_selected])
 
         elif action == "backup":
+            orig_dir = os.path.abspath(os.path.curdir)
+            os.chdir(kwargs["project_path"] + "/..")
             self.crt.setup_preset_pwd(kwargs["pwd"])
-            self.crt.handle_directory(kwargs["project_path"], out=os.path.join(self.config["backup_dir"] + "renew_test", project_name))
+            self.crt.handle_directory(kwargs["project_path"], out=os.path.join(os.path.join(self.config["backup_dir"], "renew_test"), project_name) + ".hshbck")
             self.popup_message("Project backed up successfully")
+            os.chdir(orig_dir)
 
         elif action == "restore":
             self.crt.setup_preset_pwd(kwargs["pwd"])
@@ -65,8 +69,8 @@ class Core(MenuHandler):
             return cfg
 
 
-def launch_hsh(args):
-    core = Core(args.__dict__)
+def launch_hsh_gui(args):
+    core = GUICore(args.__dict__)
     core.run()
 
 
