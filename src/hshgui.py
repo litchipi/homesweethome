@@ -2,16 +2,18 @@
 #-*-encoding:utf-8*-
 
 import os
+import time
 import json
 
-from menu_handler import MenuHandler
+from tui.menu_handler import MenuHandler
+from tui.popups import popup_information, popup_error
 
 from cantreadth1s import CantReadThis
 
 class GUICore(MenuHandler):
     default_config = {
             "crt_seclevel":10,
-            "backup_dir":"./backup/",
+            "backup_dir":"./backup/renew_test/",
             "sessions_dir":"./sessions/"
             }
 
@@ -20,10 +22,12 @@ class GUICore(MenuHandler):
         self.config.update(config)
         self.setup_filesystem()
         projlist = list()
+
         for _, _, f in os.walk(self.config["sessions_dir"]):
             projlist += f
         MenuHandler.__init__(self, self.config, projlist)
-
+        self.sessions_data = dict()
+        self.load_sessions()
         self.crt = CantReadThis(sec_level=self.config["crt_seclevel"])
 
     def setup_filesystem(self):
@@ -37,8 +41,19 @@ class GUICore(MenuHandler):
         super().run()
         print(self.final_project)
 
+    def save_session_data(self, project, key, val):
+        self.sessions_data[project][key] = val
+        with open(os.path.join(self.config["sessions_dir"], project), "w") as jsf:
+            json.dump(self.sessions_data[project], jsf)
+
+    def load_sessions(self):
+        for f in os.scandir(self.config["sessions_dir"]):
+            with open(f.path, "r") as jsf:
+                self.sessions_data[f.name] = json.load(jsf)
+
     def dispatch_menu_actions(self, action, project_name, **kwargs):
         if action == "start":
+            self.save_session_data(project_name, "last_used", time.asctime())
             self.switchForm(None)
             self.final_project = (self.project_selected, self.projects_configs[self.project_selected])
 
@@ -46,27 +61,36 @@ class GUICore(MenuHandler):
             orig_dir = os.path.abspath(os.path.curdir)
             os.chdir(kwargs["project_path"] + "/..")
             self.crt.setup_preset_pwd(kwargs["pwd"])
-            self.crt.handle_directory(kwargs["project_path"], out=os.path.join(os.path.join(self.config["backup_dir"], "renew_test"), project_name) + ".hshbck")
-            self.popup_message("Project backed up successfully")
+            ret = self.crt.handle_directory(kwargs["project_path"], out=os.path.join(self.config["backup_dir"], project_name) + ".hshbck")
             os.chdir(orig_dir)
+            if not ret[0]:
+                popup_error("Cannot backup project", add_info=ret[1])
+            else:
+                popup_information("Project backed up successfully", wide=False)
+                self.save_session_data(project_name, "last_backup", time.asctime())
+
 
         elif action == "restore":
             self.crt.setup_preset_pwd(kwargs["pwd"])
             curd = os.path.abspath(os.curdir)
             os.chdir(kwargs["restore_path"])
-            self.crt.handle_file(os.path.join(self.config["backup_dir"], project_name))
+            ret = self.crt.handle_file(os.path.join(self.config["backup_dir"], project_name) + ".hshbck.cant_read_this")
             os.chdir(curd)
-            self.popup_message("Project restored successfully")
+            if not ret[0]:
+                popup_error("Cannot restore backup", add_info=ret[1])
+                breakpoint()
+            else:
+                popup_information("Project restored successfully", wide=False)
+                self.save_session_data(project_name, "last_restore", time.asctime())
 
         elif action == "get_session_config":
-            cfg_fname = None
-            for path, dirs, files in os.walk(self.config["sessions_dir"]):
-                if project_name in files:
-                    cfg_fname = os.path.abspath(os.path.join(path, project_name))
-                break
-            with open(cfg_fname, "r") as f:
-                cfg = json.load(f)
-            return cfg
+            if project_name in self.sessions_data.keys():
+                return self.sessions_data[project_name]
+            else:
+                return None
+
+        elif action == "check_backup_exist":
+            return any([project_name in f.name for f in os.scandir(self.config["backup_dir"])])
 
 
 def launch_hsh_gui(args):
