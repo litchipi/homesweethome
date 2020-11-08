@@ -10,46 +10,134 @@ from tui.popups import popup_information, popup_error
 
 from cantreadth1s import CantReadThis
 
-class GUICore(MenuHandler):
+class Core:
     default_config = {
-            "crt_seclevel":10,
-            "backup_dir":"./backup/renew_test/",
-            "sessions_dir":"./sessions/"
+            "crt_seclevel":1,
+            "data_dir":"~/.local/share/homesweethome/"
             }
+
+    default_config["archive"] = os.path.join(default_config["data_dir"], "archive.crt")
+    default_config["database"] = os.path.join(default_config["data_dir"], "database")
+    default_config["hsh_tools"] = os.path.join(default_config["data_dir"], "tools")
 
     def __init__(self, config):
         self.config = dict.copy(self.default_config)
         self.config.update(config)
-        self.setup_filesystem()
-        projlist = list()
 
-        for _, _, f in os.walk(self.config["sessions_dir"]):
-            projlist += f
-        MenuHandler.__init__(self, self.config, projlist)
-        self.sessions_data = dict()
-        self.load_sessions()
-        self.crt = CantReadThis(sec_level=self.config["crt_seclevel"])
+        if os.path.isfile(self.config["archive"]):
+            with open(self.config["archive"], "r") as jdata:
+                self.archive = json.loads(jdata)
+        else:
+            self.setup_new_archive()
+        self.menuhandler = MenuHandler(self.config, projlist)
 
-    def setup_filesystem(self):
-        for d in ["sessions_dir", "backup_dir"]:
-            self.config[d] = os.path.abspath(self.config[d])
-            if not os.path.isdir(self.config[d]):
-                os.mkdir(self.config[d])
+    def get_system_name(self):
+        return os.uname().nodename
 
+    def setup_new_archive(self):
+        metadata = {
+                "systems":{self.get_system_name():self.config["database"]},
+                "seeds":{
+                    #"project_name":<crt_password_seed>
+                    }
+                "crt_config":{
+                    # General configuration for CRT
+                    }
+                }
+
+        projects = {
+                #"project_name":{
+                #   ####### CRT #######     -> Not secured -> password = project name
+                #   "tmux_env":"tmuxp_env_data",                       #hsh save
+                #   "tools_config":{"tmux":"basic", "nvim":"python"},  #hsh change config <tool> <config name>
+                #   "custom_aliases":{"ll":"ls -lah"},                 #hsh set alias <alias> <command>
+                #   "configuration":{
+                #       "general":{
+                #           "auto_backup":True,                 # Project config
+                #           "bck_purge_after": nb_saves         # Project config
+                #           "auto_log":True,                    # Project config
+                #           "auto_log_systems":None             # Project config        None -> All systems     list -> list of systems
+                #           "log_purge_after":time_in_secs      # Project config
+                #           },
+                #       "sparta":{
+                #           "auto_log":False        # Project config
+                #           }
+                #       }
+                #   "remote_git":{
+                #       "url":"https://github.com/litchipi/homesweethome",      # Project config     or   hsh set remote_git url <url>
+                #       "ssh_key":<ssh key>                                     # hsh set remote_git ssh    ->  Secure prompt for ssh key
+                #   }
+                #   "notes":{
+                #       <ident>:<note>              #hsh note <ident> <data>
+                #   }
+                #   "todo":{
+                #       <ident>:<priority>          #hsh todo add <ident> <priority=0>
+                #                                   #hsh todo done <ident>
+                #                                   #hsh todo list
+                #       }
+                #   }
+                }
+
+        tools = {
+                "tmux":{    #hsh add tool <name>    -> Prompt for configuration (custom config + command)
+                    "custom_config_param":"-f",
+                    "command":"tmux",
+                    "saved_configurations":{
+                        #"basic":configuration_file_dump                                                        #hsh set config <tool> <config name> <path to config>
+                        },
+                    "installation_script":None      #If user save installation script, store it here            #hsh set install <tool> <path to script>
+                }
+        
+        backups = {
+            #"project_name":{
+            #   "autobck":{
+            #       ####### Compressed #######
+            #       <time_in_secs_0>:{
+            #           "0001-azelkfjazle.patch":<patch_data>,
+            #           "0002-laezkjfleak.patch":<patch_data>
+            #           },
+            #       ####### Compressed #######
+            #       <time_in_secs_1>:...
+            #       }
+            #   "manual":{
+            #       <ident>:<crt backup of the project>
+            #       }
+            }
+
+        logs = {
+            #"project_name":{                       # Project config
+            #   ####### CRT #######
+            #   "manual":{                          # hsh log <entry> <data>
+            #       <entry>:(<timestamp>,<data>)
+            #   }
+            #   <time_in_secs_0>:{
+            #       ####### Compressed #######
+            #       "windows0_pane0":<logs>,
+            #       ####### Compressed #######
+            #       "windows1_pane0":<logs>,
+            #       ####### Compressed #######
+            #       "windows1_pane1":<logs>
+            #       }
+            #   <time_in_secs_1>:{
+            #       ####### Compressed #######
+            #       "windows0_pane0":<logs>,
+            #       ####### Compressed #######
+            #       "windows1_pane0":<logs>,
+            #       ####### Compressed #######
+            #       "windows1_pane1":<logs>
+            #       }
+            #   }
+            }
+        self.archive = {"metadata":metadata, "projects":projects, "tools":tools, "backups":backups, "logs":logs}
+
+    def run(self):
+        self.menuhandler.run()
+        print(self.final_project)
+
+class GUICore(MenuHandler):
     def run(self):
         self.set_dispatch_fct(self.dispatch_menu_actions)
         super().run()
-        print(self.final_project)
-
-    def save_session_data(self, project, key, val):
-        self.sessions_data[project][key] = val
-        with open(os.path.join(self.config["sessions_dir"], project), "w") as jsf:
-            json.dump(self.sessions_data[project], jsf)
-
-    def load_sessions(self):
-        for f in os.scandir(self.config["sessions_dir"]):
-            with open(f.path, "r") as jsf:
-                self.sessions_data[f.name] = json.load(jsf)
 
     def dispatch_menu_actions(self, action, project_name, **kwargs):
         if action == "start":
@@ -57,44 +145,23 @@ class GUICore(MenuHandler):
             self.switchForm(None)
             self.final_project = (self.project_selected, self.projects_configs[self.project_selected])
 
-        elif action == "backup":
-            orig_dir = os.path.abspath(os.path.curdir)
-            os.chdir(kwargs["project_path"] + "/..")
-            self.crt.setup_preset_pwd(kwargs["pwd"])
-            ret = self.crt.handle_directory(kwargs["project_path"], out=os.path.join(self.config["backup_dir"], project_name) + ".hshbck")
-            os.chdir(orig_dir)
-            if not ret[0]:
-                popup_error("Cannot backup project", add_info=ret[1])
-            else:
-                popup_information("Project backed up successfully", wide=False)
-                self.save_session_data(project_name, "last_backup", time.asctime())
+        elif action == "new":
+            pass
 
+        elif action == "backup":
+            pass
 
         elif action == "restore":
-            self.crt.setup_preset_pwd(kwargs["pwd"])
-            curd = os.path.abspath(os.curdir)
-            os.chdir(kwargs["restore_path"])
-            ret = self.crt.handle_file(os.path.join(self.config["backup_dir"], project_name) + ".hshbck.cant_read_this")
-            os.chdir(curd)
-            if not ret[0]:
-                popup_error("Cannot restore backup", add_info=ret[1])
-                breakpoint()
-            else:
-                popup_information("Project restored successfully", wide=False)
-                self.save_session_data(project_name, "last_restore", time.asctime())
+            pass
 
         elif action == "get_session_config":
-            if project_name in self.sessions_data.keys():
-                return self.sessions_data[project_name]
-            else:
-                return None
+            return {}
 
         elif action == "check_backup_exist":
-            return any([project_name in f.name for f in os.scandir(self.config["backup_dir"])])
-
+            return True
 
 def launch_hsh_gui(args):
-    core = GUICore(args.__dict__)
+    core = Core(args.__dict__)
     core.run()
 
 

@@ -1,9 +1,32 @@
-Menu via npyscreen
-Sessions via tmuxp
-Backup & Restore with CantReadTh1s
-Online saves ?
+Default project data
+Menu
+    New project
+        -> Form fields from project data
+        -> Setup general project configuration, then configuration specific for this system
+    Load project
+        -> Select the path for the project to load or create a new dir
+        -> Load from backup / remote git / create empty
+    Set project config
+        -> Setup metadata
+        -> Setup configuration specific for this system
+    Backup project
+        -> Create manual backup of the project
+            -> All data
+            -> Git patches
+    Restore project
+        -> From remote git
+        -> From manual backup
+            -> All data or git patches
+        -> From auto backup
+    Delete project
+        -> Delete from local system
+        -> Delete all on the archive
 
-
-
-Improvements:
-    Menu with transparent background
+New tool config -> save to archive
+Hsh server core
+Tmuxp   ->  Configuration
+        ->  Alias "hsh" -> "hsh -L <port number> -C <client> ..."
+        ->  Commands hsh <...>
+Git integration
+Automatic backups
+Logging

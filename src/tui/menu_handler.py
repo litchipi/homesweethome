@@ -6,6 +6,7 @@ import curses
 import npyscreen as nps
 
 from .wrappers import create_button, get_filepath
+from .popups import popup_binary_question
 
 # https://npyscreen.readthedocs.io/application-objects.html
 class MenuHandler(nps.NPSAppManaged):
@@ -24,7 +25,7 @@ class MenuHandler(nps.NPSAppManaged):
     def onStart(self):
         self.addForm("select_project", ProjectSelectionForm, self.project_list, name="Home Sweet Home", height=(len(self.project_list)+5))
         self.addForm("open_project", StartProj, name="Start project")
-        self.addForm("new_project", NotImplementedForm, name="New project")
+        self.addForm("new_project", NewProj, name="New project")
 
     def set_dispatch_fct(self, fct):
         self.dispatch = fct
@@ -39,6 +40,17 @@ class MenuHandler(nps.NPSAppManaged):
         pwd_prompt.edit()
         return pwd_prompt.get_result()
 
+    def get_softwares_configs(self):
+        return {"tmux":["base"], "nvim":["base", "C", "Python"]}   #TODO Load from CRT stored configurations
+
+    def create_project(self, config):
+        self.dispatch("new", config["name"], project_config=config)
+        binquest = BinaryQuestion("Start the new project ?")
+        binquest.edit()
+        if (binquest.get_result() == "Yes"):
+            self.dispatch("start", config["name"])
+        else:
+            self.switchForm("select_project")
 
 # https://npyscreen.readthedocs.io/form-objects.html
 class ProjectSelectionForm(nps.FormBaseNew):
@@ -90,10 +102,50 @@ class ButtonList(nps.MultiLineAction):
     def update_buttons(self):
         self.values = list()
         for n in self.parent.buttons_names:
-            if (n == "restore") and not self.parent.parentApp.dispatch("check_backup_exist", self.parent.parentApp.project_selected):
+            if not self.parent.update_button_name(n):
                 continue
             self.values.append(n.capitalize())
         self.update()
+
+class FormFlags:
+    PASSWORD_INPUT=0
+
+class NewProj(nps.FormBaseNew):
+    def __init__(self, *args, **kwargs):
+        softconf = self.parentApp.get_softwares_configs()
+        form_fields = {
+                "name":("Name",    "", "What name will appear on the menu", None),
+                "descr":("Description", "", "Short text explaining the project", None),
+                "priority":("Priority",    0, "The higher, the more on top of the list",None),
+
+                "secured":("Secured", ["Yes", "No"], "Protected by a password (for every data saved)", None),
+                "password":("Password", FormFlags.PASSWORD_INPUT, "Password of the project", lambda f: (f["secured"]=="Yes")),
+
+                "backup":("Backup",  ["Enabled", "Disabled"], "Automatic backup", None),
+                "logging":("Logging", ["Disabled", "Enabled"], "Log and save the logs of the shell", None),
+
+                "fromgit":("From git",    ["Yes", "No"], "Import the project from a remote git repository ?", None),
+                "remote_git_url":("Remote Git URL",  "", "URL of the remote git to clone", lambda f: (f["fromgit"]=="Yes")),
+                "create_git_repo":("Create a Git repository", ["Yes", "No"], "Automatically setup a git repository", lambda f: (f["fromgit"]=="No")),
+                }
+
+        for soft, configs in softconf.keys():
+            form_fields[soft + "_config"] = ("Configuration of " + soft, ["No pre-config"] + configs, "Select the configuration to use for the software " + soft, None)
+
+        self.config_form = ConfigurationTool(form_fields)
+
+        self.buttons_names = ["create", "return"]
+        nps.FormBaseNew.__init__(self, *args, **kwargs)
+        self.butt_list = self.add(ButtonList)
+
+    def update_button_name(self, name):
+        return True
+
+    def button_dispatcher(self, ident):
+        if ident == "return":
+            self.parentApp.switchForm("select_project")
+        elif ident == "create":
+            self.parentApp.create_project(self.config_form.config)
 
 class StartProj(nps.FormBaseNew):
     def __init__(self, *args, **kwargs):
@@ -101,6 +153,11 @@ class StartProj(nps.FormBaseNew):
         self.actions_kwargs = {k:dict() for k in self.buttons_names}
         nps.FormBaseNew.__init__(self, *args, **kwargs)
         self.butt_list = self.add(ButtonList)
+
+    def update_button_name(self, name):
+        if (n == "restore") and not self.parent.parentApp.dispatch("check_backup_exist", self.parent.parentApp.project_selected):
+            return False
+        return True
 
     def pre_edit_loop(self):
         self.butt_list.update_buttons()
@@ -122,6 +179,25 @@ class StartProj(nps.FormBaseNew):
             self.actions_kwargs[ident]["restore_path"] = get_filepath("Place to restore project",
                     info="Will create a new directory inside the one selected", isfile=False, choose_existing=False)
 
+class BinaryQuestion(nps.Form):
+    def __init__(self, msg, *args, options=["Yes", "No"], **kwargs):
+        nps.Form.__init__(self, *args, **kwargs)
+        self.buttons_names = options
+        self.text = self.add(nps.FixedText, editable=False)
+        self.text.value = msg
+        self.text.set_editable(False)
+        self.text.display()
+        self.add(ButtonList)
+        self.result = None
+
+    def get_result(self):
+        return self.result
+
+    def update_button_name(self, name):
+        return True
+
+    def button_dispatcher(self, name):
+        self.result = name
 
 class PasswordPrompt(nps.Form):
     def __init__(self, msg, *args, **kwargs):
