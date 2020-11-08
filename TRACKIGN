@@ -1,0 +1,26 @@
+HSH     ->  ~/.local/bin
+    <no cmd>
+        -> GUI
+    <list>
+        -> List projects
+    <load> name
+        -> Load project
+            name in auto completion
+    <new>
+        -> Create new project
+            Questions -> answers stored
+    <save>
+        -> Save currently opened project
+    <quit>
+        -> Quit currently opened project
+    <backup>
+        -> Backup currently opened project
+            Backed up with name based on date
+    <restore>
+        -> Restore from backup name
+    <info>
+        -> Displays informations on the current project
+
+
+TODO   
+    tmuxp
